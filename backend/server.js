@@ -12,8 +12,19 @@ const Groq         = require('groq-sdk');
 const app  = express();
 const PORT = process.env.PORT || 3001;
 
+// ── Lazy Groq initialization (fixes Render env var issue) ─
+let _groq;
+function getGroq() {
+  if (!_groq) {
+    if (!process.env.GROQ_API_KEY) {
+      throw new Error('GROQ_API_KEY environment variable is missing.');
+    }
+    _groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+  }
+  return _groq;
+}
+
 // ── Logger ────────────────────────────────────────────────
-// Custom morgan format with timestamp
 morgan.token('timestamp', () => new Date().toISOString());
 const logFormat = '[:timestamp] :method :url :status :response-time ms - :res[content-length]';
 app.use(morgan(logFormat));
@@ -24,12 +35,12 @@ app.use(helmet({
 }));
 
 // ── Security: CORS ────────────────────────────────────────
-const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:5500,http://127.0.0.1:5500').split(',');
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || '*').split(',');
 
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow requests with no origin (mobile apps, curl, Postman)
     if (!origin) return callback(null, true);
+    if (allowedOrigins.includes('*')) return callback(null, true);
     if (allowedOrigins.includes(origin)) return callback(null, true);
     callback(new Error(`CORS: Origin ${origin} not allowed`));
   },
@@ -41,7 +52,7 @@ app.use(express.json({ limit: '1mb' }));
 
 // ── Security: Rate Limiting ───────────────────────────────
 const globalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,  // 15 minutes
+  windowMs: 15 * 60 * 1000,
   max: 100,
   message: { error: 'Too many requests. Please try again in 15 minutes.' },
   standardHeaders: true,
@@ -49,7 +60,7 @@ const globalLimiter = rateLimit({
 });
 
 const uploadLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000,  // 1 hour
+  windowMs: 60 * 60 * 1000,
   max: 20,
   message: { error: 'Upload limit reached. Maximum 20 uploads per hour.' },
   standardHeaders: true,
@@ -61,7 +72,7 @@ app.use(globalLimiter);
 // ── File Upload: Multer ───────────────────────────────────
 const upload = multer({
   dest: 'uploads/',
-  limits: { fileSize: 25 * 1024 * 1024 },  // 25 MB
+  limits: { fileSize: 25 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     const allowedMimes = ['audio/mpeg','audio/wav','audio/x-wav','audio/mp3','audio/mp4','audio/ogg','audio/webm'];
     const allowedExts  = /\.(mp3|wav|mp4|m4a|ogg|webm|flac)$/i;
@@ -69,9 +80,6 @@ const upload = multer({
     cb(ok ? null : new Error('Unsupported audio format. Use MP3 or WAV.'), ok);
   },
 });
-
-// ── Groq Client ───────────────────────────────────────────
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 // ── Input Validation ──────────────────────────────────────
 function validateInput(title, date, language) {
@@ -116,7 +124,7 @@ app.post('/upload', uploadLimiter, upload.single('audio'), async (req, res) => {
     fs.renameSync(tmpPath, namedPath);
 
     // ── Step 1: Transcribe ────────────────────────────────
-    console.log(`[TRANSCRIBE] Starting for: ${req.file.originalname} (${(req.file.size/1024/1024).toFixed(2)} MB)`);
+    console.log(`[TRANSCRIBE] Starting: ${req.file.originalname} (${(req.file.size/1024/1024).toFixed(2)} MB)`);
 
     const transcriptionOptions = {
       file:            fs.createReadStream(namedPath),
@@ -125,9 +133,9 @@ app.post('/upload', uploadLimiter, upload.single('audio'), async (req, res) => {
     };
     if (audioLanguage !== 'auto') transcriptionOptions.language = audioLanguage;
 
-    const transcription = await groq.audio.transcriptions.create(transcriptionOptions);
+    const transcription = await getGroq().audio.transcriptions.create(transcriptionOptions);
     const transcript    = transcription.text.trim();
-    console.log(`[TRANSCRIBE] Done. ${transcript.length} characters in ${Date.now()-startTime}ms`);
+    console.log(`[TRANSCRIBE] Done. ${transcript.length} chars in ${Date.now()-startTime}ms`);
 
     // ── Step 2: Generate Notes ────────────────────────────
     console.log(`[AI] Generating notes...`);
@@ -136,11 +144,32 @@ app.post('/upload', uploadLimiter, upload.single('audio'), async (req, res) => {
       ? `IMPORTANT: Generate the summary, key_points, and action_items in ${notesLanguage} language.`
       : 'Generate notes in the same language as the transcript.';
 
-    const chat = await groq.chat.completions.create({
+    const chat = await getGroq().chat.completions.create({
       model: 'llama-3.3-70b-versatile',
       messages: [
-        { role: 'system', content: 'You are an expert meeting analyst. Respond ONLY with a valid JSON object — no markdown, no code fences, no explanation.' },
-        { role: 'user', content: `Meeting title: ${meetingTitle}\nMeeting date: ${meetingDate}\n\nTranscript:\n"""\n${transcript}\n"""\n\nReturn JSON with keys: summary (2-4 sentences), key_points (array of 4-8 strings), action_items (array of strings, format: Person — Task by Deadline).\n\n${languageInstruction}\n\nReturn ONLY the JSON object.` },
+        {
+          role: 'system',
+          content: 'You are an expert meeting analyst. Respond ONLY with a valid JSON object — no markdown, no code fences, no explanation.',
+        },
+        {
+          role: 'user',
+          content: `Meeting title: ${meetingTitle}
+Meeting date: ${meetingDate}
+
+Transcript:
+"""
+${transcript}
+"""
+
+Return JSON with keys:
+- summary: 2-4 sentence overview
+- key_points: array of 4-8 strings
+- action_items: array of strings (format: Person — Task by Deadline)
+
+${languageInstruction}
+
+Return ONLY the JSON object.`,
+        },
       ],
       temperature: 0.3,
       max_tokens:  1024,
@@ -151,11 +180,15 @@ app.post('/upload', uploadLimiter, upload.single('audio'), async (req, res) => {
     try {
       notes = JSON.parse(rawText.replace(/```json|```/g, '').trim());
     } catch {
-      notes = { summary: 'Could not parse AI response.', key_points: [], action_items: [] };
+      notes = {
+        summary:      'Could not parse AI response. Please review the transcript.',
+        key_points:   ['See transcript for details.'],
+        action_items: ['Review transcript and assign action items manually.'],
+      };
     }
 
     const totalTime = Date.now() - startTime;
-    console.log(`[AI] Done. Total processing time: ${totalTime}ms`);
+    console.log(`[AI] Done. Total: ${totalTime}ms`);
 
     return res.json({
       transcript,
@@ -170,9 +203,10 @@ app.post('/upload', uploadLimiter, upload.single('audio'), async (req, res) => {
   } catch (err) {
     console.error(`[ERROR] ${err.message}`);
 
-    // Friendly error messages
-    if (err.message.includes('rate_limit')) return res.status(429).json({ error: 'AI rate limit reached. Please wait a few minutes and try again.' });
-    if (err.message.includes('ENOENT'))     return res.status(500).json({ error: 'File processing error. Please try again.' });
+    if (err.message.includes('rate_limit'))
+      return res.status(429).json({ error: 'AI rate limit reached. Please wait a few minutes and try again.' });
+    if (err.message.includes('ENOENT'))
+      return res.status(500).json({ error: 'File processing error. Please try again.' });
 
     return res.status(500).json({ error: err.message || 'Internal server error.' });
 
@@ -183,7 +217,7 @@ app.post('/upload', uploadLimiter, upload.single('audio'), async (req, res) => {
 });
 
 // ═══════════════════════════════════════════════════════════
-//  GET /health  — Used by Render & monitoring tools
+//  GET /health
 // ═══════════════════════════════════════════════════════════
 app.get('/health', (_req, res) => {
   res.json({
@@ -210,6 +244,6 @@ app.use((err, _req, res, _next) => {
 app.listen(PORT, () => {
   console.log(`\n🚀  MeetingAI backend running on http://localhost:${PORT}`);
   console.log(`   NODE_ENV      : ${process.env.NODE_ENV || 'development'}`);
-  console.log(`   GROQ_API_KEY  : ${process.env.GROQ_API_KEY  ? '✅ set' : '❌ missing'}`);
-  console.log(`   ALLOWED_ORIGINS: ${process.env.ALLOWED_ORIGINS || 'localhost (default)'}\n`);
+  console.log(`   GROQ_API_KEY  : ${process.env.GROQ_API_KEY ? '✅ set' : '❌ missing'}`);
+  console.log(`   ALLOWED_ORIGINS: ${process.env.ALLOWED_ORIGINS || '* (all)'}\n`);
 });
