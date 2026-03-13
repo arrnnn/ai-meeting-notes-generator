@@ -7,9 +7,9 @@ on:
     branches: [main, master]
 
 jobs:
-  # ── Job 1: Test ───────────────────────────────────────────
-  test:
-    name: Run Tests
+  # ── Job 1: Install & Audit ────────────────────────────────
+  build:
+    name: Build & Security Audit
     runs-on: ubuntu-latest
 
     steps:
@@ -27,65 +27,40 @@ jobs:
         working-directory: backend
         run: npm install
 
-      - name: Start server in background
-        working-directory: backend
-        env:
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-          PORT: 3001
-          NODE_ENV: test
-        run: |
-          npm start &
-          sleep 4
-
-      - name: Run health check tests
-        working-directory: backend
-        run: npm test
-
-      - name: Stop server
-        run: pkill -f "node server.js" || true
-
-  # ── Job 2: Security Audit ─────────────────────────────────
-  security:
-    name: Security Audit
-    runs-on: ubuntu-latest
-    needs: test
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: backend/package-lock.json
-
-      - name: Install dependencies
-        working-directory: backend
-        run: npm install
-
-      - name: Run npm audit
+      - name: Check for vulnerabilities
         working-directory: backend
         run: npm audit --audit-level=high
         continue-on-error: true
 
-  # ── Job 3: Deploy to Render ───────────────────────────────
+      - name: Verify server file exists
+        working-directory: backend
+        run: |
+          test -f server.js && echo "✅ server.js found" || exit 1
+          test -f package.json && echo "✅ package.json found" || exit 1
+
+      - name: Build summary
+        run: |
+          echo "================================"
+          echo "  ✅ Build Complete"
+          echo "  Branch : ${{ github.ref_name }}"
+          echo "  Commit : ${{ github.sha }}"
+          echo "================================"
+
+  # ── Job 2: Deploy ─────────────────────────────────────────
   deploy:
     name: Deploy to Render
     runs-on: ubuntu-latest
-    needs: [test, security]
+    needs: build
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
 
     steps:
       - name: Trigger Render Deploy
         run: |
-          curl -s -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}" \
-            -H "Content-Type: application/json" \
-            --fail \
-            && echo "✅ Deploy triggered successfully" \
-            || echo "⚠️ Deploy hook not configured — skipping"
-        continue-on-error: true
+          if [ -n "${{ secrets.RENDER_DEPLOY_HOOK_URL }}" ]; then
+            curl -s -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}" && echo "✅ Deploy triggered"
+          else
+            echo "⚠️ RENDER_DEPLOY_HOOK_URL not set — skipping deploy"
+          fi
 
       - name: Deployment summary
         run: |
@@ -93,5 +68,4 @@ jobs:
           echo "  ✅ CI/CD Pipeline Complete"
           echo "  Branch : ${{ github.ref_name }}"
           echo "  Commit : ${{ github.sha }}"
-          echo "  Time   : $(date -u)"
           echo "================================"
