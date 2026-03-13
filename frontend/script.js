@@ -1,4 +1,4 @@
-const API_BASE = 'http://localhost:3002';
+const API_BASE = 'https://ai-meeting-notes-generator.onrender.com';
 
 const audioInput       = document.getElementById('audioInput');
 const uploadZone       = document.getElementById('uploadZone');
