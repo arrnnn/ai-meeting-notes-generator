@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Meeting Notes Generator</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <canvas id="bgCanvas"></canvas>
+
+  <div class="app-layout">
+
+    <!-- ── Sidebar ── -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-brand">
+          <div class="brand-icon">📁</div>
+          <span class="sidebar-title">Meeting History</span>
+        </div>
+        <button class="sidebar-close" id="sidebarClose" aria-label="Close">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="sidebar-list" id="historyList">
+        <div class="sidebar-empty">
+          <div class="empty-icon">🗂️</div>
+          <p>No meetings saved yet</p>
+          <span>Generate your first notes to see them here</span>
+        </div>
+      </div>
+      <div class="sidebar-footer">
+        <button class="btn btn-ghost btn-sm" id="clearAllBtn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+          Clear All History
+        </button>
+      </div>
+    </aside>
+
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+    <!-- ── Main ── -->
+    <div class="main-wrap">
+
+      <!-- Top nav -->
+      <nav class="topnav">
+        <div class="topnav-inner">
+          <div class="nav-brand">
+            <div class="nav-logo">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 003 3v1a3 3 0 01-3 3 3 3 0 01-3-3V5a3 3 0 013-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+            </div>
+            <span class="nav-title">MeetingAI</span>
+          </div>
+          <button class="history-btn" id="historyBtn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+            <span>History</span>
+            <span class="history-count" id="historyCount" style="display:none;">0</span>
+          </button>
+        </div>
+      </nav>
+
+      <div class="container">
+
+        <!-- Hero -->
+        <header class="header">
+          <div class="header-eyebrow">
+            <span class="eyebrow-dot"></span>
+            AI-Powered Meeting Intelligence
+          </div>
+          <h1 class="title">Turn Meetings Into<br><span class="title-accent">Actionable Notes</span></h1>
+          <p class="subtitle">Upload your meeting audio and receive a structured summary, key discussion points, and assigned action items — powered by advanced AI.</p>
+          <div class="header-stats">
+            <div class="stat"><span class="stat-num">50+</span><span class="stat-label">Languages</span></div>
+            <div class="stat-divider"></div>
+            <div class="stat"><span class="stat-num">25MB</span><span class="stat-label">Max file size</span></div>
+            <div class="stat-divider"></div>
+            <div class="stat"><span class="stat-num">~30s</span><span class="stat-label">Processing time</span></div>
+          </div>
+        </header>
+
+        <!-- Upload Card -->
+        <div class="card upload-card" id="uploadCard">
+          <div class="card-section-label">Meeting Details</div>
+          <div class="meeting-meta">
+            <div class="meta-field">
+              <label for="meetingTitle">Meeting Title</label>
+              <input type="text" id="meetingTitle" placeholder="e.g. Q3 Product Review" />
+            </div>
+            <div class="meta-field">
+              <label for="meetingDate">Date</label>
+              <input type="date" id="meetingDate" />
+            </div>
+            <div class="meta-field">
+              <label for="meetingLanguage">Audio Language</label>
+              <select id="meetingLanguage">
+                <option value="auto">🌍 Auto Detect</option>
+                <option value="en">🇺🇸 English</option>
+                <option value="ar">🇸🇦 Arabic</option>
+                <option value="hi">🇮🇳 Hindi</option>
+                <option value="fr">🇫🇷 French</option>
+                <option value="es">🇪🇸 Spanish</option>
+                <option value="de">🇩🇪 German</option>
+                <option value="zh">🇨🇳 Chinese</option>
+                <option value="ja">🇯🇵 Japanese</option>
+                <option value="ko">🇰🇷 Korean</option>
+                <option value="pt">🇧🇷 Portuguese</option>
+                <option value="ru">🇷🇺 Russian</option>
+                <option value="it">🇮🇹 Italian</option>
+                <option value="tr">🇹🇷 Turkish</option>
+                <option value="ml">🇮🇳 Malayalam</option>
+                <option value="ta">🇮🇳 Tamil</option>
+                <option value="te">🇮🇳 Telugu</option>
+                <option value="ur">🇵🇰 Urdu</option>
+              </select>
+            </div>
+            <div class="meta-field">
+              <label for="notesLanguage">Output Language</label>
+              <select id="notesLanguage">
+                <option value="same">Same as audio</option>
+                <option value="en">English</option>
+                <option value="ar">Arabic</option>
+                <option value="hi">Hindi</option>
+                <option value="fr">French</option>
+                <option value="es">Spanish</option>
+                <option value="de">German</option>
+                <option value="ml">Malayalam</option>
+                <option value="ta">Tamil</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="card-section-label" style="margin-top:8px;">Audio File</div>
+
+          <div class="upload-zone" id="uploadZone">
+            <div class="upload-visual">
+              <div class="upload-rings">
+                <div class="ring ring1"></div>
+                <div class="ring ring2"></div>
+                <div class="ring ring3"></div>
+              </div>
+              <div class="upload-mic">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                  <path d="M12 2a3 3 0 013 3v7a3 3 0 01-6 0V5a3 3 0 013-3z"/>
+                  <path d="M19 10v2a7 7 0 01-14 0v-2"/>
+                  <line x1="12" y1="19" x2="12" y2="23"/>
+                  <line x1="8" y1="23" x2="16" y2="23"/>
+                </svg>
+              </div>
+            </div>
+            <p class="upload-text">Drag & drop your audio file</p>
+            <p class="upload-sub">Supports MP3, WAV · Maximum 25MB</p>
+            <label class="btn btn-outline" for="audioInput">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              Select File
+            </label>
+            <input type="file" id="audioInput" accept=".mp3,.wav,audio/mpeg,audio/wav" hidden />
+          </div>
+
+          <div class="file-preview" id="filePreview" style="display:none;">
+            <div class="file-info">
+              <div class="file-icon-wrap">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+              </div>
+              <div class="file-details">
+                <p class="file-name" id="fileName">audio.mp3</p>
+                <p class="file-size" id="fileSize">2.4 MB · Ready to process</p>
+              </div>
+              <button class="remove-file" id="removeFile" title="Remove file">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+              </button>
+            </div>
+            <audio id="audioPlayer" controls></audio>
+          </div>
+
+          <button class="btn btn-primary" id="generateBtn" disabled>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            Generate Meeting Notes
+          </button>
+        </div>
+
+        <!-- Loading -->
+        <div class="loading-card" id="loadingCard" style="display:none;">
+          <div class="loading-header">
+            <div class="loading-title">Processing your meeting</div>
+            <div class="loading-sub">This usually takes 15–30 seconds</div>
+          </div>
+          <div class="loading-steps">
+            <div class="step" id="step1">
+              <div class="step-indicator"><div class="step-dot"></div></div>
+              <div class="step-content"><span class="step-name">Uploading audio</span><span class="step-desc">Sending file to server</span></div>
+            </div>
+            <div class="step" id="step2">
+              <div class="step-indicator"><div class="step-dot"></div></div>
+              <div class="step-content"><span class="step-name">Transcribing speech</span><span class="step-desc">Converting audio to text</span></div>
+            </div>
+            <div class="step" id="step3">
+              <div class="step-indicator"><div class="step-dot"></div></div>
+              <div class="step-content"><span class="step-name">Analyzing content</span><span class="step-desc">AI processing transcript</span></div>
+            </div>
+            <div class="step" id="step4">
+              <div class="step-indicator"><div class="step-dot"></div></div>
+              <div class="step-content"><span class="step-name">Structuring notes</span><span class="step-desc">Formatting final output</span></div>
+            </div>
+          </div>
+          <div class="waveform">
+            <span></span><span></span><span></span><span></span><span></span>
+            <span></span><span></span><span></span><span></span><span></span>
+          </div>
+        </div>
+
+        <!-- Results -->
+        <div class="results" id="results" style="display:none;">
+
+          <div class="results-header">
+            <div class="results-meta">
+              <p class="results-eyebrow">Meeting Notes</p>
+              <h2 class="results-title" id="resultTitle">Team Meeting</h2>
+              <p class="results-date" id="resultDate"></p>
+            </div>
+            <div class="results-actions">
+              <button class="btn btn-ghost btn-sm" id="copyBtn">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                Copy
+              </button>
+              <button class="btn btn-ghost btn-sm" id="downloadTxtBtn">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 16l-4-4h3V4h2v8h3l-4 4z"/><path d="M2 20h20"/></svg>
+                TXT
+              </button>
+              <button class="btn btn-primary btn-sm" id="downloadPdfBtn">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 16l-4-4h3V4h2v8h3l-4 4z"/><path d="M2 20h20"/></svg>
+                Export PDF
+              </button>
+            </div>
+          </div>
+
+          <!-- Transcript -->
+          <div class="card result-card">
+            <button class="card-header-btn" id="transcriptToggle">
+              <div class="card-header-left">
+                <div class="card-icon card-icon-gray">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                </div>
+                <span class="card-label">Full Transcript</span>
+              </div>
+              <span class="toggle-icon">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+              </span>
+            </button>
+            <div class="card-body collapsed" id="transcriptBody">
+              <p id="transcriptText" class="transcript-text"></p>
+            </div>
+          </div>
+
+          <!-- Summary -->
+          <div class="card result-card reveal-card">
+            <div class="card-header">
+              <div class="card-header-left">
+                <div class="card-icon card-icon-blue">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="9" x2="15" y2="9"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="12" y2="17"/></svg>
+                </div>
+                <span class="card-label">Meeting Summary</span>
+              </div>
+            </div>
+            <div class="card-body"><p id="summaryText"></p></div>
+          </div>
+
+          <!-- Key Points -->
+          <div class="card result-card reveal-card">
+            <div class="card-header">
+              <div class="card-header-left">
+                <div class="card-icon card-icon-amber">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                </div>
+                <span class="card-label">Key Discussion Points</span>
+              </div>
+            </div>
+            <div class="card-body"><ul id="keyPointsList" class="result-list"></ul></div>
+          </div>
+
+          <!-- Action Items -->
+          <div class="card result-card reveal-card">
+            <div class="card-header">
+              <div class="card-header-left">
+                <div class="card-icon card-icon-green">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+                </div>
+                <span class="card-label">Action Items</span>
+              </div>
+              <span class="card-hint">Click to mark complete</span>
+            </div>
+            <div class="card-body"><ul id="actionItemsList" class="result-list action-list"></ul></div>
+          </div>
+
+          <div class="results-footer">
+            <button class="btn btn-outline" id="newMeetingBtn">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              New Meeting
+            </button>
+          </div>
+        </div>
+
+        <!-- Error -->
+        <div class="error-card" id="errorCard" style="display:none;">
+          <div class="error-inner">
+            <div class="error-icon">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            </div>
+            <div>
+              <p class="error-title">Processing Failed</p>
+              <p id="errorMessage" class="error-msg">Something went wrong. Please try again.</p>
+            </div>
+          </div>
+          <button class="btn btn-outline" id="retryBtn">Try Again</button>
+        </div>
+
+      </div>
+
+      <!-- Mobile bottom nav -->
+      <div class="mobile-nav">
+        <button class="mobile-nav-btn" id="mobileHistoryBtn">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+          <span>History</span>
+          <span class="history-count mobile-count" id="mobileHistoryCount" style="display:none;">0</span>
+        </button>
+        <div class="mobile-nav-center">
+          <div class="nav-logo-sm">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 013 3v7a3 3 0 01-6 0V5a3 3 0 013-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/></svg>
+          </div>
+          MeetingAI
+        </div>
+        <button class="mobile-nav-btn" id="mobileNewBtn">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          <span>New</span>
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="script.js"></script>
+  <script>
+    const canvas = document.getElementById('bgCanvas');
+    const ctx = canvas.getContext('2d');
+    let W, H, bars, particles, time = 0;
+    function resize() { W=canvas.width=window.innerWidth; H=canvas.height=window.innerHeight; initBars(); initParticles(); }
+    function initBars() { bars=[]; const cols=28,rows=7; for(let r=0;r<rows;r++) for(let c=0;c<cols;c++) bars.push({col:c,row:r,cols,rows,phase:Math.random()*Math.PI*2,speed:0.4+Math.random()*0.6,base:0.05+Math.random()*0.15}); }
+    function initParticles() { particles=Array.from({length:50},()=>({x:Math.random()*W,y:Math.random()*H,r:1+Math.random()*2,vx:(Math.random()-0.5)*0.3,vy:-(0.15+Math.random()*0.4),alpha:0.05+Math.random()*0.12,hue:210+Math.random()*40})); }
+    function drawBars() {
+      const cols=28,rows=7,cellW=W/cols,baseY=H*0.85,maxH=H*0.28,perspective=0.55;
+      for(let b=bars.length-1;b>=0;b--) {
+        const {col,row}=bars[b]; const rowFrac=row/(rows-1),scale=perspective+(1-perspective)*rowFrac;
+        const yOffset=(1-rowFrac)*H*0.15,bx=(col+0.5)*cellW,by=baseY-yOffset;
+        const amp=bars[b].base+0.1*Math.sin(time*bars[b].speed+bars[b].phase+col*0.3);
+        const bh=maxH*amp*scale,bw=cellW*0.5*scale,alpha=0.04+rowFrac*0.06;
+        const grad=ctx.createLinearGradient(bx,by-bh,bx,by);
+        grad.addColorStop(0,`hsla(215,70%,65%,${alpha*1.6})`);
+        grad.addColorStop(0.5,`hsla(220,60%,50%,${alpha})`);
+        grad.addColorStop(1,`hsla(225,70%,35%,${alpha*0.3})`);
+        ctx.fillStyle=grad; ctx.beginPath(); ctx.roundRect(bx-bw/2,by-bh,bw,bh,2); ctx.fill();
+      }
+    }
+    function drawWaves() {
+      for(let w=0;w<3;w++) {
+        ctx.beginPath();
+        const yBase=H*(0.3+w*0.1),amp=14+w*8,freq=0.007-w*0.002,speed=0.5+w*0.25,alpha=0.03-w*0.008;
+        for(let x=0;x<=W;x+=4) { const y=yBase+Math.sin(x*freq+time*speed)*amp+Math.sin(x*freq*1.6+time*speed*0.7)*amp*0.35; x===0?ctx.moveTo(x,y):ctx.lineTo(x,y); }
+        ctx.strokeStyle=`hsla(215,60%,60%,${alpha})`; ctx.lineWidth=1.2-w*0.3; ctx.stroke();
+      }
+    }
+    function drawParticles() { particles.forEach(p=>{p.x+=p.vx;p.y+=p.vy;p.vy+=0.001;if(p.y<-10){p.y=H+10;p.x=Math.random()*W;}if(p.x<-10)p.x=W+10;if(p.x>W+10)p.x=-10;ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fillStyle=`hsla(${p.hue},60%,65%,${p.alpha})`;ctx.fill();}); }
+    function drawCircles() { const cx=W*0.5,cy=H*0.45; for(let i=3;i>=1;i--){const r=(W*0.25*i)+Math.sin(time*0.35+i)*10;ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.strokeStyle=`hsla(215,50%,55%,${0.02-i*0.004})`;ctx.lineWidth=1;ctx.stroke();} }
+    function animate() { ctx.clearRect(0,0,W,H); time+=0.014; drawCircles(); drawWaves(); drawBars(); drawParticles(); requestAnimationFrame(animate); }
+    window.addEventListener('resize',resize); resize(); animate();
+  </script>
+</body>
+</html>
