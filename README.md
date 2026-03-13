@@ -6,6 +6,8 @@ Powered by **OpenAI Whisper** (speech-to-text) and **Anthropic Claude** (AI anal
 
 ---
 
+live link :https://ai-meeting-notes-generator.vercel.app
+
 ## ✨ Features
 
 | Feature | Details |
